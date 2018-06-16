@@ -18,6 +18,9 @@ package com.alibaba.dubbo.remoting.zookeeper;
 
 import java.util.List;
 
+/*
+ * 监听字节点
+ * */
 public interface ChildListener {
 
     void childChanged(String path, List<String> children);

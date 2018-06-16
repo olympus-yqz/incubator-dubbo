@@ -18,10 +18,19 @@ package com.alibaba.dubbo.remoting.zookeeper;
 
 public interface StateListener {
 
+    /*
+     * 断开
+     * */
     int DISCONNECTED = 0;
 
+    /*
+     * 已链接
+     * */
     int CONNECTED = 1;
 
+    /*
+     * 重链接
+     * */
     int RECONNECTED = 2;
 
     void stateChanged(int connected);

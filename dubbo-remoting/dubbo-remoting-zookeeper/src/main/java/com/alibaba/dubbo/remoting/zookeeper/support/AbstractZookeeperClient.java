@@ -29,12 +29,21 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+/*
+ * 实现 ZookeeperClient 接口，Zookeeper 客户端抽象类，实现通用的逻辑
+ * */
 public abstract class AbstractZookeeperClient<TargetChildListener> implements ZookeeperClient {
 
     protected static final Logger logger = LoggerFactory.getLogger(AbstractZookeeperClient.class);
 
+    /*
+     * ZOOKEEPER地址
+     * */
     private final URL url;
 
+    /*
+     * 添加删除LISTENER COW机制
+     * */
     private final Set<StateListener> stateListeners = new CopyOnWriteArraySet<StateListener>();
 
     private final ConcurrentMap<String, ConcurrentMap<ChildListener, TargetChildListener>> childListeners = new ConcurrentHashMap<String, ConcurrentMap<ChildListener, TargetChildListener>>();
@@ -50,6 +59,10 @@ public abstract class AbstractZookeeperClient<TargetChildListener> implements Zo
         return url;
     }
 
+    /*
+     * ephemeral 朝生暮死; 短暂的，瞬息的; 朝露; 一年生
+     * 临时节点
+     * */
     @Override
     public void create(String path, boolean ephemeral) {
         if (!ephemeral) {

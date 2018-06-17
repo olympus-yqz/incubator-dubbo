@@ -68,14 +68,25 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see java.net.URL
  * @see java.net.URI
  */
+
+/*
+ * 所有配置最终都将转换为 Dubbo URL 表示，并由服务提供方生成，经注册中心传递给消费方，各属性对应 URL 的参数，
+ * 参见配置项一览表中的 “对应URL参数” 列。
+ * */
 public final class URL implements Serializable {
 
     private static final long serialVersionUID = -1985165475234910535L;
-
+    /*
+     * 协议
+     * */
     private final String protocol;
-
+    /*
+     * 用户
+     * */
     private final String username;
-
+    /*
+     * 密码
+     * */
     private final String password;
 
     // by default, host to registry
@@ -84,6 +95,9 @@ public final class URL implements Serializable {
     // by default, port to registry
     private final int port;
 
+    /*
+     * 路径
+     * */
     private final String path;
 
     private final Map<String, String> parameters;
@@ -308,7 +322,7 @@ public final class URL implements Serializable {
 
     /**
      * Fetch IP address for this URL.
-     *
+     * <p>
      * Pls. note that IP should be used instead of Host when to compare with socket's address or to search in a map
      * which use address as its key.
      *

@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 
 /**
  * Utility methods and public methods for parsing configuration
+ * 主要提供配置解析与校验相关的工具方法
  *
  * @export
  */
@@ -89,6 +90,11 @@ public abstract class AbstractConfig implements Serializable {
         return value;
     }
 
+    /*
+     * 读取环境变量和 properties 配置到配置对象
+     * 通过 System.getProperty 读取DUBBO配置
+     * 例子 com.alibaba.dubbo.demo.provider.Provider 中使用方式
+     * */
     protected static void appendProperties(AbstractConfig config) {
         if (config == null) {
             return;
@@ -112,6 +118,10 @@ public abstract class AbstractConfig implements Serializable {
                     }
                     if (value == null || value.length() == 0) {
                         String pn = prefix + property;
+
+                        /*
+                         * 可以通过 System.setProperty("java.net.preferIPv4Stack", "true") 的形式配置环境变量
+                         * */
                         value = System.getProperty(pn);
                         if (!StringUtils.isBlank(value)) {
                             logger.info("Use System Property " + pn + " to config dubbo");

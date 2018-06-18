@@ -43,6 +43,15 @@ public abstract class AbstractZookeeperClient<TargetChildListener> implements Zo
 
     /*
      * 添加删除LISTENER COW机制
+     *
+     * 优点
+     * 采用读写分离方式，读的效率非常高
+     * CopyOnWriteArrayList的迭代器是基于创建时的数据快照的，故数组的增删改不会影响到迭代器
+     *
+     * 缺点
+     * 内存占用高，每次执行写操作都要将原容器拷贝一份，数据量大时，对内存压力较大，可能会引起频繁GC
+     * 无法保证实时性，写和读分别作用在新老不同容器上，在写操作执行过程中，读不会阻塞但读取到的却是老容器的数据
+     *
      * */
     private final Set<StateListener> stateListeners = new CopyOnWriteArraySet<StateListener>();
 

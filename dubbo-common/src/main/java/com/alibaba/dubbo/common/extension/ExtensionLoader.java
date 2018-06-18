@@ -56,6 +56,16 @@ import java.util.regex.Pattern;
  * @see com.alibaba.dubbo.common.extension.Adaptive
  * @see com.alibaba.dubbo.common.extension.Activate
  */
+/*
+ * dubbo框架的微内核+插件的机制，其中插件机制就是依赖ExtensionLoader来实现，
+ * 可以说是dubbo的核心所在。通过插件机制解耦依赖来实现框架设计原则中的针对接口编程而不针对实现
+ * 熟悉ExtensionLoader就熟悉了Dubbo的扩展机制。
+ * Dubbo的扩展SPI：
+ * 1. 单例，对于某个扩展，只会有一个ExtensionLoader；
+ * 2. 延迟加载，可以一次只获取想要的扩展点，一次获取想要的扩展点实现；
+ * 3. 对于扩展点的Ioc和Aop，就是一个扩展可以注入到另一个扩展中，也可以对一个扩展做wrap包装实现aop的功能；
+ * 4. 对于扩展点的调用，真正调用的时候才能确认具体使用的是那个实现。
+ * */
 public class ExtensionLoader<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(ExtensionLoader.class);
@@ -95,6 +105,11 @@ public class ExtensionLoader<T> {
 
     private ExtensionLoader(Class<?> type) {
         this.type = type;
+        /*
+         * ExtensionFactory 实现类
+         * com.alibaba.dubbo.common.extension.factory.AdaptiveExtensionFactory
+         * com.alibaba.dubbo.common.extension.factory.SpiExtensionFactory
+         * */
         objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
     }
 
@@ -109,13 +124,24 @@ public class ExtensionLoader<T> {
         if (!type.isInterface()) {
             throw new IllegalArgumentException("Extension type(" + type + ") is not interface!");
         }
+
+        /*
+         * type必须包含 @SPI
+         * */
         if (!withExtensionAnnotation(type)) {
             throw new IllegalArgumentException("Extension type(" + type +
                     ") is not extension, because WITHOUT @" + SPI.class.getSimpleName() + " Annotation!");
         }
 
+        /*
+         * Extenstion 缓存在 ConcurrentMap 中。
+         * Extenstion 在缓存中只能存在一份
+         * */
         ExtensionLoader<T> loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         if (loader == null) {
+            /*
+             * 缓存中没有，就新建一个
+             * */
             EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader<T>(type));
             loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         }
@@ -550,6 +576,9 @@ public class ExtensionLoader<T> {
         Map<String, Class<?>> classes = cachedClasses.get();
         if (classes == null) {
             synchronized (cachedClasses) {
+                /*
+                 * 有可能在执行 if (classes == null) { 时，class已经创建
+                 * */
                 classes = cachedClasses.get();
                 if (classes == null) {
                     classes = loadExtensionClasses();
@@ -561,6 +590,9 @@ public class ExtensionLoader<T> {
     }
 
     // synchronized in getExtensionClasses
+    /*
+     * 在调用方法 getExtensionClasses 中已经使用synchronized 进行同步了
+     * */
     private Map<String, Class<?>> loadExtensionClasses() {
         final SPI defaultAnnotation = type.getAnnotation(SPI.class);
         if (defaultAnnotation != null) {
@@ -576,13 +608,29 @@ public class ExtensionLoader<T> {
         }
 
         Map<String, Class<?>> extensionClasses = new HashMap<String, Class<?>>();
+
+        /*
+         * DUBBO_DIRECTORY + "internal/"
+         * */
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY);
+        /*
+         * META-INF/dubbo/
+         * */
         loadDirectory(extensionClasses, DUBBO_DIRECTORY);
+        /*
+         * META-INF/services/
+         * */
         loadDirectory(extensionClasses, SERVICES_DIRECTORY);
         return extensionClasses;
     }
 
+    /*
+     * 在 dir 目录中查找指定的文件
+     * */
     private void loadDirectory(Map<String, Class<?>> extensionClasses, String dir) {
+        /*
+         * 文件夹路径+构造函数中为type赋值的接口
+         * */
         String fileName = dir + type.getName();
         try {
             Enumeration<java.net.URL> urls;

@@ -45,6 +45,9 @@ public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {
     protected Integer delay;
 
     // whether to export the service
+    /*
+     * 是否暴露服务
+     * */
     protected Boolean export;
 
     // weight

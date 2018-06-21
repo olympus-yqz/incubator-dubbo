@@ -7,7 +7,7 @@ import com.alibaba.dubbo.config.ServiceConfig;
 import com.alibaba.dubbo.demo.provider.api.Welcome;
 import com.alibaba.dubbo.demo.provider.impl.WelcomeImpl;
 
-public class Demo001 {
+public class DubboBootStrapSample001 {
 
     public static void main(String[] args) {
         /*

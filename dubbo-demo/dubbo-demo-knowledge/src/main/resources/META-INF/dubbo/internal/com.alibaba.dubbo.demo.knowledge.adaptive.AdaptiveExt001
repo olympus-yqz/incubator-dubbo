@@ -1,0 +1,3 @@
+dubbo=com.alibaba.dubbo.demo.knowledge.adaptive.impl.DubboAdaptiveExt001
+cloud=com.alibaba.dubbo.demo.knowledge.adaptive.impl.SpringCloudAdaptiveExt001
+thrift=com.alibaba.dubbo.demo.knowledge.adaptive.impl.ThriftAdaptiveExt001

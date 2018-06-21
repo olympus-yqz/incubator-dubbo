@@ -56,6 +56,7 @@ import java.util.regex.Pattern;
  * @see com.alibaba.dubbo.common.extension.Adaptive
  * @see com.alibaba.dubbo.common.extension.Activate
  */
+
 /*
  * dubbo框架的微内核+插件的机制，其中插件机制就是依赖ExtensionLoader来实现，
  * 可以说是dubbo的核心所在。通过插件机制解耦依赖来实现框架设计原则中的针对接口编程而不针对实现
@@ -70,6 +71,9 @@ public class ExtensionLoader<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(ExtensionLoader.class);
 
+    /*
+     * 兼容 JAVA SPI 目录
+     * */
     private static final String SERVICES_DIRECTORY = "META-INF/services/";
 
     private static final String DUBBO_DIRECTORY = "META-INF/dubbo/";
@@ -78,24 +82,50 @@ public class ExtensionLoader<T> {
 
     private static final Pattern NAME_SEPARATOR = Pattern.compile("\\s*[,]+\\s*");
 
+    /*
+     * Extension 缓存，线程安全
+     * */
     private static final ConcurrentMap<Class<?>, ExtensionLoader<?>> EXTENSION_LOADERS = new ConcurrentHashMap<Class<?>, ExtensionLoader<?>>();
 
     private static final ConcurrentMap<Class<?>, Object> EXTENSION_INSTANCES = new ConcurrentHashMap<Class<?>, Object>();
 
     // ==============================
 
+    /*
+     * 扩展点接口类型
+     * */
     private final Class<?> type;
-
+    /*
+     * 为 DUBBO IOC 提供对象
+     * */
     private final ExtensionFactory objectFactory;
 
     private final ConcurrentMap<Class<?>, String> cachedNames = new ConcurrentHashMap<Class<?>, String>();
 
+    /*
+     * public class Holder<T> {
+     *
+     *      private volatile T value;
+     *
+     *      public void set(T value) {
+     *          this.value = value;
+     *      }
+     *
+     *      public T get() {
+     *          return value;
+     *      }
+     * }
+     * volatile 多线程，值修改之后。其他线程可见
+     */
     private final Holder<Map<String, Class<?>>> cachedClasses = new Holder<Map<String, Class<?>>>();
 
     private final Map<String, Activate> cachedActivates = new ConcurrentHashMap<String, Activate>();
     private final ConcurrentMap<String, Holder<Object>> cachedInstances = new ConcurrentHashMap<String, Holder<Object>>();
     private final Holder<Object> cachedAdaptiveInstance = new Holder<Object>();
     private volatile Class<?> cachedAdaptiveClass = null;
+    /*
+     * @SPI("XXX")
+     * */
     private String cachedDefaultName;
     private volatile Throwable createAdaptiveInstanceError;
 
@@ -103,20 +133,35 @@ public class ExtensionLoader<T> {
 
     private Map<String, IllegalStateException> exceptions = new ConcurrentHashMap<String, IllegalStateException>();
 
+    /*
+     * 私有构造函数, ExtensionLoader 不可以在类之外 NEW
+     * type 赋值
+     * 加载type的工厂类 ExtensionFactory
+     * */
     private ExtensionLoader(Class<?> type) {
         this.type = type;
         /*
          * ExtensionFactory 实现类
          * com.alibaba.dubbo.common.extension.factory.AdaptiveExtensionFactory
          * com.alibaba.dubbo.common.extension.factory.SpiExtensionFactory
+         *
+         * ExtensionFactory 也是扩展点，可以有多种实现。当type为 ExtensionFactory 时。不需要创建
          * */
-        objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
+        objectFactory = (type == ExtensionFactory.class ? null :
+                /*
+                 * ExtensionFactory 扩展点
+                 * */
+                ExtensionLoader.getExtensionLoader(ExtensionFactory.class)
+                        .getAdaptiveExtension());
     }
 
     private static <T> boolean withExtensionAnnotation(Class<T> type) {
         return type.isAnnotationPresent(SPI.class);
     }
 
+    /*
+     * 首先调用此方法从缓存中获取
+     * */
     @SuppressWarnings("unchecked")
     public static <T> ExtensionLoader<T> getExtensionLoader(Class<T> type) {
         if (type == null)
@@ -140,7 +185,8 @@ public class ExtensionLoader<T> {
         ExtensionLoader<T> loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
         if (loader == null) {
             /*
-             * 缓存中没有，就新建一个
+             * 缓存中没有，就新建一个.
+             * 先放入缓存，其他线程可以直接读取扩展点。不需要创建
              * */
             EXTENSION_LOADERS.putIfAbsent(type, new ExtensionLoader<T>(type));
             loader = (ExtensionLoader<T>) EXTENSION_LOADERS.get(type);
@@ -314,6 +360,7 @@ public class ExtensionLoader<T> {
     /**
      * Find the extension with the given name. If the specified name is not found, then {@link IllegalStateException}
      * will be thrown.
+     * 根据传入的名字， 在指定的位置查找接口的对应实现类，扩展点
      */
     @SuppressWarnings("unchecked")
     public T getExtension(String name) {
@@ -458,8 +505,15 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /*
+     * 根据规则获取扩展适配器, 装饰模式
+     *
+     * */
     @SuppressWarnings("unchecked")
     public T getAdaptiveExtension() {
+        /*
+         * 适配器缓存中寻找， 只能有一个
+         * */
         Object instance = cachedAdaptiveInstance.get();
         if (instance == null) {
             if (createAdaptiveInstanceError == null) {
@@ -467,7 +521,13 @@ public class ExtensionLoader<T> {
                     instance = cachedAdaptiveInstance.get();
                     if (instance == null) {
                         try {
+                            /*
+                             * 创建
+                             * */
                             instance = createAdaptiveExtension();
+                            /*
+                             * instance 放入实例缓存
+                             * */
                             cachedAdaptiveInstance.set(instance);
                         } catch (Throwable t) {
                             createAdaptiveInstanceError = t;
@@ -534,6 +594,13 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /*
+     * inject	英[ɪnˈdʒekt]
+     * 美[ɪnˈdʒɛkt]
+     * vt.	（给…）注射（药物等） ; （给…）注射（液体） ; （给…） 添加; （给…）投入（资金） ;
+     *
+     * 进入IOC的反转控制，实现动态注入
+     * */
     private T injectExtension(T instance) {
         try {
             if (objectFactory != null) {
@@ -596,6 +663,9 @@ public class ExtensionLoader<T> {
     private Map<String, Class<?>> loadExtensionClasses() {
         final SPI defaultAnnotation = type.getAnnotation(SPI.class);
         if (defaultAnnotation != null) {
+            /*
+             * 获得注解值, 为空代表@SPI 注解并设置
+             * */
             String value = defaultAnnotation.value();
             if ((value = value.trim()).length() > 0) {
                 String[] names = NAME_SEPARATOR.split(value);
@@ -610,6 +680,8 @@ public class ExtensionLoader<T> {
         Map<String, Class<?>> extensionClasses = new HashMap<String, Class<?>>();
 
         /*
+         * 分别在internal, dubbo, services 中寻找
+         *
          * DUBBO_DIRECTORY + "internal/"
          * */
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY);
@@ -634,6 +706,32 @@ public class ExtensionLoader<T> {
         String fileName = dir + type.getName();
         try {
             Enumeration<java.net.URL> urls;
+            /*
+             * JVM在判定两个class是否相同时，不仅要判断两个类名是否相同，而且要判断是否由同一个类加载器实例加载的。
+             * 只有两者同时满足的情况下，JVM才认为这两个class是相同的。就算两个class是同一份class字节码，
+             * 如果被两个不同的ClassLoader实例所加载，JVM也会认为它们是两个不同class。
+             *
+             * getResource()和getSystemResource()分析
+             *
+             * 1. getClass().getResource()
+             * 第一步，getClass().getResource(path)是有一个路径参数的，这个路径会先被转换成"类所在的包名称+path"，举个例子，
+             * 当调用com.test.A.class.getResource(“config.properties”)时，最终这个path会被转换为"com\test\config.properties"。
+             *
+             * 第二步，便会调用类的类加载器对象的getResource()方法，继续上面的例子，也就是等于：
+             * com.test.A.class.getClassLoader().getResource("com\test\config.properties")（为了方便A类的类加载其对象简称cl）。
+             *
+             * 第三步，分析cl.getResource()发现，此方法会返回cl的"第一条匹配到记录的加载路径+path"的URL对象。举个例子，
+             * cl类加载器的加载路径是"\home\aaa"和"\home\bbb"，而config.properties在\home\bbb下面，
+             * 那么cl.getResource("com\test\config.properties")返回的URL就是"\home\bbb\com\test\config.properties"，
+             * 注意，这个寻找的过程也是符合双亲委托机制的。如果父类的加载路径中存在匹配项，那么返回的便是父类中的匹配路径。
+             * （此方法中核心部分是要被子类来覆盖的，所以此处说的是URLClassLoader中的实现）
+             *
+             * 2. ClssLoader.getSystemResource()
+             * ClssLoader.getSystemResource(path)更简单，它等价getSystemClassLoader().getResource(path)，衔接上面的第三步。
+             *
+             * 3. 总结
+             * 也就是说，不管是类对象的getResource()还是类加载器的getSystemResouce()，都是走的类加载器的getResource()，类加载器会搜索自己的加载路径来匹配寻找项。而最常用的类加载器就是AppClassLoader，又因为APPClassLoader的加载路径是classpath，所以网上文章一般都会说getClass().getResouce()是返回classpath，这是不够准确的。
+             * */
             ClassLoader classLoader = findClassLoader();
             if (classLoader != null) {
                 urls = classLoader.getResources(fileName);
@@ -768,7 +866,13 @@ public class ExtensionLoader<T> {
         }
     }
 
+    /*
+     * 得到 Extension class
+     * */
     private Class<?> getAdaptiveExtensionClass() {
+        /*
+         * 得到适配器类，放入缓存。或其他线程放入。 如果类有注解@Adaptive直接返回。
+         * */
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {
             return cachedAdaptiveClass;
